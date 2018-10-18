@@ -115,12 +115,11 @@ void printww() {
 	//
 }
 
-int main() {
+usb_dev_handle *Connect_swtich() {
 	usb_dev_handle *dev = NULL; /* the device handle */
 	int ret;
 	void* async_read_context = NULL;
 	void* async_write_context = NULL;
-	printww();
 	cout << "等待连接switch";
 	do {
 		usb_init();
@@ -135,9 +134,14 @@ int main() {
 	cout << "success: switch设备连接成功！" << endl;
 	usb_set_configuration(dev, 1);
 	usb_claim_interface(dev, MY_INTF);
-	unsigned char tul0[4] = {84,85,76,48};
-	unsigned char len[4] = {0};
-	unsigned char padding[8] = {0};
+	return dev;
+}
+
+void send_filelist(usb_dev_handle *dev) {
+	int ret;
+	unsigned char tul0[4] = { 84,85,76,48 };
+	unsigned char len[4] = { 0 };
+	unsigned char padding[8] = { 0 };
 	char title[100];
 	string path_;
 	cout << "输入游戏目录" << endl;
@@ -147,24 +151,20 @@ int main() {
 	long l = 0;
 	for (int i = 0; i < files.size(); i++)
 		l += files[i].length();
-	memcpy(len, &l, 4); 
-	ret=usb_write(dev, tul0,4);
-	ret=usb_write(dev, len,4);
-	ret=usb_write(dev, padding,8);
+	memcpy(len, &l, 4);
+	ret = usb_write(dev, tul0, 4);
+	ret = usb_write(dev, len, 4);
+	ret = usb_write(dev, padding, 8);
 	for (int i = 0; i < files.size(); i++) {
 		string f = files[i];
-		f.copy(title,f.length(), 0);
+		f.copy(title, f.length(), 0);
 		title[f.length()] = '\0';
 		usb_write(dev, title, f.length());
 	}
 	if (ret == 1)
-		cout<<"请在switch界面选择要安装的nsp文件！"<<endl;
+		cout << "请在switch界面选择要安装的nsp文件！" << endl;
 	poll_commands(dev);
-	system("pause");
-	return 0;
 }
-
-
 void poll_commands(usb_dev_handle *dev) {
 	unsigned char cmd[32];
 	unsigned char magic[5];
@@ -189,16 +189,13 @@ void poll_commands(usb_dev_handle *dev) {
 		submit_char_arr(cmd, cmd_id, 8, 12);
 		submit_char_arr(cmd, cmd_size, 12, 20);
 		if (cmd_id[0] == CMD_ID_EXIT) {
-			cout << "NSP安装完成！ 关闭软件即可...." << endl;
+			cout << "NSP安装完成。" << endl;
 			break;
 		}
 		if (cmd_id[0] == CMD_ID_FILE_RANGE)
 			file_range_cmd(dev, cmd_size);
 	}
 }
-
-
-
 void file_range_cmd(usb_dev_handle *dev, unsigned char *cmd_size) {
 	unsigned char cmd[100];
 
@@ -340,4 +337,17 @@ int usb_read(usb_dev_handle *dev, char *tmp, int len) {
 	if (ret < 0)
 		cout << usb_strerror() << endl;
 	return ret;
+}
+int main() {
+	usb_dev_handle *dev = NULL;
+	char boo;
+	printww();
+	dev= Connect_swtich();
+	do {
+		send_filelist(dev);
+		cout << "是否继续安装? y:继续安装" << endl;
+		cin >> boo;
+	}while(boo=='y');
+	
+	return 0;
 }
